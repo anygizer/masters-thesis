@@ -2,7 +2,7 @@
 
 \usepackage{fontspec}
 \usepackage{polyglossia}
-\usepackage[left=2.5cm,top=2.5cm,right=2.5cm,bottom=2.5cm,nohead]{geometry}
+\usepackage[left=3cm,top=2cm,right=1cm,bottom=2cm,nohead]{geometry}
 \usepackage{setspace}
 \usepackage{listings}
 \usepackage{color}
@@ -17,9 +17,28 @@
 
 \defaultfontfeatures{Mapping=tex-text}
 
-\setmainfont{Liberation Serif}
-\setsansfont{Liberation Sans}
-\setmonofont{Liberation Mono}
+\setmainfont
+    [ Path           = fonts/ ,
+      UprightFont    = *-Regular,
+      BoldFont       = *-Bold ,
+      ItalicFont     = *-Italic ,
+      BoldItalicFont = *-BoldItalic]
+    {LiberationSerif}
+\setsansfont
+    [ Path           = fonts/ ,
+      UprightFont    = *-Regular,
+      BoldFont       = *-Bold ,
+      ItalicFont     = *-Italic ,
+      BoldItalicFont = *-BoldItalic]
+    {LiberationSans}
+\setmonofont
+    [ Path           = fonts/ ,
+      UprightFont    = *-Regular,
+      BoldFont       = *-Bold ,
+      ItalicFont     = *-Italic ,
+      BoldItalicFont = *-BoldItalic]
+    {LiberationMono}
+
 \setmainlanguage{ukrainian}
 \setotherlanguage{english}
 
@@ -29,7 +48,8 @@
 \pretolerance=-1
 \tolerance=2300
 
-\thispagestyle{empty}
+\pagenumbering{arabic}
+\pagestyle{empty}
 \setlength{\parindent}{1.5cm}
 \fontsize{14pt}{6mm}\selectfont
 
@@ -78,13 +98,9 @@
 \setstretch{1.5}
 \fontsize{14pt}{6mm}\selectfont
 
-\newcommand{\vect}[1]{(#1_1,#1_2,\dots,#1_n)}
-
-\thispagestyle{empty}
 \tableofcontents
 \clearpage
-\pagenumbering{arabic}
-
+\pagestyle{plain}
 \section{Вступ}
 
 1. Розростання програми\\
