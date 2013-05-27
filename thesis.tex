@@ -47,6 +47,16 @@
 
 \setstretch{1.1}
 
+\definecolor{javared}{rgb}{0.6,0,0}
+\lstset{
+	basicstyle=\footnotesize\ttfamily,
+	tabsize=3,
+	showspaces=false,
+	stringstyle=\color{javared},
+	showstringspaces=false,
+	xleftmargin=	.6cm
+}
+
 \begin{document}
 \pretolerance=-1
 \tolerance=2300
@@ -466,14 +476,134 @@ WHILE (черга подій не порожня)\\
 \textbf{Результати апробації.} Сам алгоритм працює доволі добре, принаймі в межах проведених тестів. Було досягнуто успіху в поєднанні таких функцій, як: додавання елементів в схему, підключення елементів між собою, відключення елементів. Але так і не вдалось досягнути коректності роботи алгоритму при видаленні елементів зі схеми. Проблема полягає не лише в реалізації якоїсь окремої функції, а в реалізації алгоритму вцілому так щоб усі функції працювали злагоджено.
 
 
-%
-% * перероблений алгоритм на запис елемнтів які терба обробляти в ЧМП
-%
-% * лістинг переробленого алгоритму
-%
-% * результати
-%
+\textbf{Видозмінений однопрохідний алгоритм}
 
+Хоча це і однопрохідний алгоритм, але розроблений він був на основі визе наведеного двопрохідного алгоритму. Головною ідейною відмінністю даного алгоритму є те, що в ЧМП реєструються не елементи, які викликають подію, а елементи яких подія стосується.
+
+Такий підхід покликаний вирішити проблему з видаленням елементів, яка виникала в попередньому алгоритмі. Нижче подано метод \textbf{LogicCircuit::step()}, який і являє собою реалізацію видозміненого алгоритму.
+
+\begin{lstlisting}[language=Java]
+@Override public void step()
+{
+  while(!feq.isEmpty())
+  {
+    Map.Entry<Integer, HashMap<BasicElement, HashMap<String, Double>>> head =
+      feq.remove();
+    Integer currentDelay = head.getKey();
+    System.out.println("Delay: " + currentDelay);
+    // for each event (element) in the queue for the current delay
+    for (Map.Entry<BasicElement, HashMap<String, Double>> entry
+      : head.getValue().entrySet())
+    {
+      BasicElement bEl = entry.getKey();
+      HashMap<String, Double> elSignals = entry.getValue();
+      HashMap<String, Double> signalsToProcess = new HashMap<>();
+      for(String port : bEl.getPorts())
+      {
+        Double val = elementPortValue.get(bEl).get(port);
+        if(elementPortConnection.containsKey(bEl)
+                && elementPortConnection.get(bEl).containsKey(port))
+        {
+          Connection conn = elementPortConnection.get(bEl).get(port);
+          // connection existance check
+          if (conn != null)
+          {
+            BasicElement connEl = (BasicElement) conn.getOther(bEl);
+            val = (val + elementPortValue.get(connEl)
+              .get(conn.getElementPort(connEl))) / 2;
+          }
+        }
+        signalsToProcess.put(port, val);
+      }
+      signalsToProcess.putAll(elSignals);
+      Map<String, Double> processedSignals = bEl.process(signalsToProcess);
+      for(Map.Entry<String, Double> ps : processedSignals.entrySet())
+      {
+        String port = ps.getKey();
+        Double val = ps.getValue();
+        if(val.compareTo(elementPortValue.get(bEl).get(port)) != 0)
+        {
+          // change circuit value
+          elementPortValue.get(bEl).put(port, val);
+          if (elementPortConnection.containsKey(bEl)
+                  && elementPortConnection.get(bEl).containsKey(port))
+          {
+            Connection conn = elementPortConnection.get(bEl).get(port);
+            // connection existance check
+            if (conn != null)
+            {
+              BasicElement connEl = (BasicElement) conn.getOther(bEl);
+              // register connected elements in the FEQ
+              // for the further processing
+              feq.addEvent(bEl.getDelay(), connEl,
+                conn.getElementPort(connEl), val);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+\end{lstlisting}
+
+При цьому, функції структурної взаємодії зі схемою є доволі прості, навідміну від двопрохідного алгоритму. При його реалізації ці функції включали частково логіку самої обробки схеми, яка була винесена в окремий приватний метод моделі логічної схеми (\lstinline$LogicCircuit$). При даному алгоритмі вони виглядають так як подано нижче.
+
+\begin{lstlisting}
+connectElements(Element firstElement, String firstElementPort,
+ 	            Element secondElement, String secondElementPort)
+{
+  if(super.connectElements(firstElement, firstElementPort,
+       secondElement, secondElementPort))
+  {
+    BasicElement fbe = (BasicElement)firstElement;
+    BasicElement sbe = (BasicElement)secondElement;
+
+    feq.addEvent(sbe.getDelay(), fbe, firstElementPort,
+      elementPortValue.get(sbe).get(secondElementPort));
+    feq.addEvent(fbe.getDelay(), sbe, secondElementPort,
+      elementPortValue.get(fbe).get(firstElementPort));
+
+    return true;
+  }
+  return false;
+}
+
+disconnectElements(Element firstElement, String firstElementPort,
+                   Element secondElement, String secondElementPort)
+{
+  BasicElement fbe = (BasicElement) firstElement;
+  BasicElement sbe = (BasicElement) secondElement;
+
+  feq.addEvent(0, fbe, firstElementPort, defaultValue());
+  feq.addEvent(0, sbe, secondElementPort, defaultValue());
+
+  super.disconnectElements(firstElement, firstElementPort,
+    secondElement, secondElementPort);
+}
+
+addElement(Element element)
+{
+  super.addElement(element);
+
+  Map<String, Double> elementSignals = new HashMap<>();
+  for(String port : element.getPorts())
+  {
+    elementSignals.put(port, defaultValue());
+  }
+  elementPortValue.put(element, element.process(elementSignals));
+}
+
+removeElement(Element element)
+{
+  super.removeElement(element);
+  elementPortValue.remove(element);
+  return true;
+}
+\end{lstlisting}
+
+\textbf{Результати апробації.} Проблема видалення елементів була вирішена цим алгоритмом. Але з’явилась інша проблема - після певних ітерацій значення на входах/виходах елементів можуть бути некоректні. Внаслідок цього деякі схеми моделюються не правильно.
+
+Дослідження та апробації були проведені на розширеному наборі тестів, який використовувався при перевірці первинного алгоритму і набору елементів.
 
 \clearpage
 
@@ -754,9 +884,7 @@ WHILE (черга подій не порожня)\\
 
 Частково це вже відбулось, так як на конференціях поступало декілька пропозицій, які цікаві на сьогоднішній день і можуть бути реалізовані з деякою зміною даного функціоналу.
 
-Також, одною з цікавих напрямків розвитку, думка та ідея про який з’явилась внаслідок проведених досліджень та співпраці з Тимчуком Ю.А. та ознайомленням з його магістерською роботою
-%\cite{thesis-Tymchuk}
-, є переведення BUMMEL з електронної лабораторії в платформу для досліджень моделювання різних процесів, або побудова такої на базі цієї програми.
+Також, одною з цікавих напрямків розвитку, думка та ідея про який з’явилась внаслідок проведених досліджень та співпраці з Тимчуком Ю.А. та ознайомленням з його магістерською роботою \cite{thesis-Tymchuk}, є переведення BUMMEL з електронної лабораторії в платформу для досліджень моделювання різних процесів, або побудова такої на базі цієї програми.
 
 Приносить радість те, що над проектом працює жвава команда розробників, які привносять кожен щось своє і нове в даний продукт, діляться цікавими конструктивними ідеями та демонструють практичні рішення до різних проблем, що постають на шляху розвитку електронної лабораторії BUMMEL.
 
